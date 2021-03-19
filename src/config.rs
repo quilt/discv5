@@ -49,11 +49,6 @@ pub struct Discv5Config {
     /// excluded if they do not pass this filter. The default is to accept all nodes.
     pub table_filter: fn(&Enr) -> bool,
 
-    /// The callback for handling TALKREQ requests. The input to this callback is the protocol and
-    /// the output is the response sent back to the requester.
-    // This is a temporary measure and this may change in the future.
-    pub talkreq_callback: fn(&[u8], &[u8]) -> Vec<u8>,
-
     /// The time between pings to ensure connectivity amongst connected nodes. Default: 300
     /// seconds.
     pub ping_interval: Duration,
@@ -90,7 +85,6 @@ impl Default for Discv5Config {
             query_parallelism: 3,
             ip_limit: false,
             table_filter: |_| true,
-            talkreq_callback: |_, _| Vec::new(),
             ping_interval: Duration::from_secs(300),
             report_discovered_peers: true,
             filter_config: FilterConfig::default(),
@@ -203,13 +197,6 @@ impl Discv5ConfigBuilder {
     /// excluded if they do not pass this filter.
     pub fn table_filter(&mut self, filter: fn(&Enr) -> bool) -> &mut Self {
         self.config.table_filter = filter;
-        self
-    }
-
-    /// The callback function for handling TALK requests. The input is the protocol in bytes and the request data in bytes and
-    /// the output will be the response sent back to the requester.
-    pub fn talkreq_callback(&mut self, callback: fn(&[u8], &[u8]) -> Vec<u8>) -> &mut Self {
-        self.config.talkreq_callback = callback;
         self
     }
 
