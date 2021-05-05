@@ -46,9 +46,43 @@ mod ip_vote;
 mod query_info;
 mod test;
 
+/// Request type for Protocols using `TalkReq` message.
+#[derive(Debug)]
+pub struct TalkRequest {
+    id: RequestId,
+    node_address: NodeAddress,
+    protocol: Vec<u8>,
+    body: Vec<u8>,
+    sender: mpsc::UnboundedSender<HandlerRequest>,
+}
+
+impl TalkRequest {
+    pub fn protocol(&self) -> &[u8] {
+        &self.protocol
+    }
+
+    pub fn body(&self) -> &[u8] {
+        &self.body
+    }
+
+    pub fn respond(self, response: Vec<u8>) {
+        debug!("Sending TALK response to {}", self.node_address);
+
+        let response = Response {
+            id: self.id,
+            body: ResponseBody::Talk { response },
+        };
+
+        let _ = self.sender.send(HandlerRequest::Response(
+            self.node_address,
+            Box::new(response),
+        ));
+    }
+}
+
 /// A handler trait for Protocols using `TalkReq` message
 pub trait TalkReqHandler: Send {
-    fn talkreq_response(&self, protocol: &[u8], req: &[u8]) -> Vec<u8>;
+    fn talkreq_response(&self, request: TalkRequest);
 }
 
 /// The number of distances (buckets) we simultaneously request from each peer.
@@ -479,20 +513,26 @@ impl Service {
             }
             RequestBody::Talk { protocol, request } => {
                 // If a talkreq handler has been registered, send the response, else return empty bytes
-                let response = if let Some(handler) = &self.talkreq_handler {
-                    handler.talkreq_response(&protocol, &request)
+                if let Some(handler) = &self.talkreq_handler {
+                    let req = TalkRequest {
+                        id,
+                        node_address,
+                        protocol,
+                        body: request,
+                        sender: self.handler_send.clone(),
+                    };
+                    handler.talkreq_response(req);
                 } else {
-                    vec![]
-                };
-                let response = Response {
-                    id,
-                    body: ResponseBody::Talk { response },
-                };
+                    let response = Response {
+                        id,
+                        body: ResponseBody::Talk { response: vec![] },
+                    };
 
-                debug!("Sending TALK response to {}", node_address);
-                let _ = self
-                    .handler_send
-                    .send(HandlerRequest::Response(node_address, Box::new(response)));
+                    debug!("Sending TALK response to {}", node_address);
+                    let _ = self
+                        .handler_send
+                        .send(HandlerRequest::Response(node_address, Box::new(response)));
+                }
             }
             RequestBody::RegisterTopic { .. } => {
                 debug!("Received RegisterTopic request which is unimplemented");
