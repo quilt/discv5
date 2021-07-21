@@ -80,6 +80,10 @@ impl Drop for TalkRequest {
 }
 
 impl TalkRequest {
+    pub fn node_address(&self) -> &NodeAddress {
+        &self.node_address
+    }
+
     pub fn protocol(&self) -> &[u8] {
         &self.protocol
     }
